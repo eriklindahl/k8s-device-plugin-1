@@ -51,6 +51,13 @@ func (r *resourceManager) distributedAlloc(available, required []string, size in
 		replicas[id].total++
 	}
 
+	// Ensure the map of physical devices with available (replicated) devices is
+	// large enough to place allocations on different IDs. If the user requested
+	// 2 devices, they need a pod where nvidia-smi shows 2 devices, not 1.
+	if len(replicas) < needed {
+		return nil, fmt.Errorf("not enough available physical devices to satisfy allocation")
+	}
+
 	// Grab the set of 'needed' devices one-by-one from the candidates list.
 	// Before selecting each candidate, first sort the candidate list using the
 	// replicas map above. After sorting, the first element in the list will
@@ -68,7 +75,7 @@ func (r *resourceManager) distributedAlloc(available, required []string, size in
 			return idiff < jdiff
 		})
 		id := AnnotatedID(candidates[0]).GetID()
-		replicas[id].available--
+		replicas[id].available = 0 // Never allocate >1 slot per physical ID
 		devices = append(devices, candidates[0])
 		candidates = candidates[1:]
 	}
